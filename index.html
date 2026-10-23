@@ -31,7 +31,7 @@
         statusText.textContent = "正在上傳至伺服器...";
 
         // 呼叫我們自己的 API（不需要暴露 Token）
-        const response = await fetch('/api/upload', {
+        const response = await fetch('/upload', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
