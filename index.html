@@ -9,13 +9,15 @@
   <h2>Upload Game JSON</h2>
 
   <input type="file" id="jsonFile" accept=".json,application/json" />
-  <button id="uploadBtn">Upload</button>
+  <button id="uploadBtn">Upload & Replace</button>
   <p id="status">No file selected.</p>
 
+  <!-- 引入 Supabase JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
+    // 請換成你的 Supabase 專案資訊
     const supabaseUrl = "https://YOUR_PROJECT_ID.supabase.co";
-    const supabaseKey = "YOUR_ANON_KEY_OR_ADMIN_KEY";
+    const supabaseKey = "YOUR_ANON_KEY";
 
     const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
@@ -37,18 +39,21 @@
       }
 
       try {
-        statusText.textContent = "Uploading...";
+        statusText.textContent = "Uploading and replacing...";
+
+        // 使用 upsert: true 來做到「如果檔案存在就取代，不存在就建立」
+        // 我們將檔名固定為 "quizJsonFile.json" 這樣永遠只有一個檔案
         const { data, error } = await supabase.storage
           .from("game-json")
-          .upload("game-data.json", file, {
+          .upload("quizJsonFile.json", file, {
             cacheControl: "0",
-            upsert: true,
+            upsert: true, 
             contentType: "application/json"
           });
 
         if (error) throw error;
 
-        statusText.textContent = "Upload successful. Game JSON updated.";
+        statusText.textContent = "Upload successful! Existing JSON replaced permanently.";
       } catch (err) {
         statusText.textContent = "Upload failed: " + err.message;
       }
