@@ -3,22 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GitHub JSON Uploader for Unity</title>
+  <title>公開 JSON 上傳工具</title>
 </head>
 <body>
-  <h2>Upload Game JSON to GitHub</h2>
-
+  <h2>上傳遊戲 JSON 到 GitHub</h2>
   <input type="file" id="jsonFile" accept=".json,application/json" /><br><br>
-  <button id="uploadBtn">Upload & Replace JSON</button>
-  <p id="status">No file selected.</p>
+  <button id="uploadBtn">上傳並覆蓋</button>
+  <p id="status">尚未選擇檔案。</p>
 
   <script>
-    // ⚠️ 請修改以下設定
-    const GITHUB_USERNAME = "BabYfuzao"; // 你的 GitHub 帳號
-    const REPO_NAME = "JsonCloud";         // 你的 Repository 名稱
-    const FILE_PATH = "quizJsonFile.json";      // 檔案在 repo 中的路徑/檔名
-    const GITHUB_TOKEN = "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";   // 剛剛產生的 Token (注意保密)
-
     const uploadBtn = document.getElementById("uploadBtn");
     const statusText = document.getElementById("status");
 
@@ -27,71 +20,35 @@
       const file = fileInput.files[0];
 
       if (!file) {
-        statusText.textContent = "Please select a JSON file.";
+        statusText.textContent = "請先選擇一個 JSON 檔案。";
         return;
       }
 
-      if (!file.name.toLowerCase().endsWith(".json")) {
-        statusText.textContent = "Only .json files are allowed.";
-        return;
-      }
-
-      statusText.textContent = "Reading file...";
+      statusText.textContent = "讀取檔案中...";
 
       try {
-        // 將檔案轉換成 Base64 格式（GitHub API 上傳檔案的規定格式）
         const base64Content = await toBase64(file);
+        statusText.textContent = "正在上傳至伺服器...";
 
-        statusText.textContent = "Checking existing file SHA...";
-        
-        // 1. 先向 GitHub API 查詢該檔案是否已經存在（需要取得它的 SHA 碼才能進行覆蓋更新）
-        const apiUrl = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${FILE_PATH}`;
-        
-        let fileSha = null;
-        const getRes = await fetch(apiUrl, {
-          headers: {
-            "Authorization": `Bearer ${GITHUB_TOKEN}`
-          }
+        // 呼叫我們自己的 API（不需要暴露 Token）
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: file.name,
+            content: base64Content
+          })
         });
 
-        if (getRes.ok) {
-          const fileData = await getRes.json();
-          fileSha = fileData.sha; // 如果檔案已存在，抓取其 SHA
-        }
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message);
 
-        statusText.textContent = "Uploading to GitHub...";
-
-        // 2. 發送 PUT 請求上傳/覆蓋檔案
-        const bodyData = {
-          message: "Update quizJsonFile.json via Web Uploader",
-          content: base64Content
-        };
-
-        if (fileSha) {
-          bodyData.sha = fileSha; // 覆蓋現有檔案必須帶上原本的 sha
-        }
-
-        const putRes = await fetch(apiUrl, {
-          method: "PUT",
-          headers: {
-            "Authorization": `Bearer ${GITHUB_TOKEN}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(bodyData)
-        });
-
-        if (!putRes.ok) {
-          const errData = await putRes.json();
-          throw new Error(errData.message || "Upload failed");
-        }
-
-        statusText.textContent = "Upload successful! JSON updated on GitHub.";
+        statusText.textContent = "上傳成功！JSON 已經更新。";
       } catch (err) {
-        statusText.textContent = "Upload failed: " + err.message;
+        statusText.textContent = "上傳失敗：" + err.message;
       }
     });
 
-    // 輔助函式：將檔案轉為 Base64
     function toBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
