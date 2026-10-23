@@ -1,59 +1,58 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>掃碼加入互動</title>
-  <script src="https://unpkg.com/@undecaf/zbar-wasm@0.10.0/dist/index.js"></script> <!-- QR 掃描 -->
-  <script src="https://cdn.jsdelivr.net/npm/osc-js@2"></script> <!-- OSC 庫 -->
-  <style>
-    body,html{margin:0;height:100%;background:#000;color:#fff;font-family:sans-serif;overflow:hidden}
-    #video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
-    #info{position:absolute;top:0;left:0;right:0;padding:20px;text-align:center;font-size:1.5em;background:rgba(0,0,0,0.6);}
-    #status{color:#0f0;}
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game JSON Uploader</title>
 </head>
 <body>
-  <video id="video" autoplay playsinline></video>
-  <div id="info">請用相機掃描大螢幕上的 QR code…</div>
-  <div id="status"></div>
+  <h2>Upload Game JSON</h2>
 
-<script>
-// 1. 開啟相機
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then(stream => document.getElementById('video').srcObject = stream);
+  <input type="file" id="jsonFile" accept=".json,application/json" />
+  <button id="uploadBtn">Upload</button>
+  <p id="status">No file selected.</p>
 
-// 2. QR code 掃描器（內建相機直接掃）
-const scanner = new ZBarScanner();
-scanner.on('scan', result => {
-  const url = new URL(result);
-  if (url.protocol !== 'unityosc:') return;
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const supabaseUrl = "https://YOUR_PROJECT_ID.supabase.co";
+    const supabaseKey = "YOUR_ANON_KEY_OR_ADMIN_KEY";
 
-  const unityIP = url.hostname;       // 例如 192.168.1.100
-  const unityPort = url.port || '9000'; // OSC 接收 port
-  const playerID = Math.floor(Math.random() * 9999);
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-  document.getElementById('info').innerHTML = `已連線！<br>你的 ID: ${playerID}<br>開始轉手機控制畫面！`;
-  document.getElementById('video').style.display = 'none';
+    const uploadBtn = document.getElementById("uploadBtn");
+    const statusText = document.getElementById("status");
 
-  // 3. 用 OSC over WebSocket 連到 Unity（最穩）
-  const osc = new OSC({ plugin: new OSC.WebsocketClientPlugin });
-  osc.open({ host: unityIP, port: 8080 });  // Unity 端的 WebSocket-OSC Bridge port
+    uploadBtn.addEventListener("click", async () => {
+      const fileInput = document.getElementById("jsonFile");
+      const file = fileInput.files[0];
 
-  // 4. 陀螺儀
-  window.addEventListener('deviceorientation', e => {
-    if (e.alpha === null) return;
-    osc.send(new OSC.Message(`/gyro/${playerID}`, e.alpha, e.beta, e.gamma));
-    // 或者你習慣的 address： /player/gyro ${playerID} 都可以
-  });
+      if (!file) {
+        statusText.textContent = "Please select a JSON file.";
+        return;
+      }
 
-  // iOS 點一下才給陀螺儀權限
-  document.body.onclick = () => DeviceOrientationEvent.requestPermission?.();
-});
+      if (!file.name.toLowerCase().endsWith(".json")) {
+        statusText.textContent = "Only .json files are allowed.";
+        return;
+      }
 
-// 每秒掃描一次
-setInterval(() => scanner.scanFromVideo(document.getElementById('video')), 1000);
-</script>
+      try {
+        statusText.textContent = "Uploading...";
+        const { data, error } = await supabase.storage
+          .from("game-json")
+          .upload("game-data.json", file, {
+            cacheControl: "0",
+            upsert: true,
+            contentType: "application/json"
+          });
+
+        if (error) throw error;
+
+        statusText.textContent = "Upload successful. Game JSON updated.";
+      } catch (err) {
+        statusText.textContent = "Upload failed: " + err.message;
+      }
+    });
+  </script>
 </body>
 </html>
